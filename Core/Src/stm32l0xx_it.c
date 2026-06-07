@@ -59,6 +59,8 @@ extern DMA_HandleTypeDef hdma_tim2_ch1;
 extern DMA_HandleTypeDef hdma_tim3_ch4_up;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim21;
+extern TSC_HandleTypeDef htsc;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -144,6 +146,20 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles Touch sense controller interrupt.
+  */
+void TSC_IRQHandler(void)
+{
+  /* USER CODE BEGIN TSC_IRQn 0 */
+
+  /* USER CODE END TSC_IRQn 0 */
+  HAL_TSC_IRQHandler(&htsc);
+  /* USER CODE BEGIN TSC_IRQn 1 */
+
+  /* USER CODE END TSC_IRQn 1 */
+}
+
+/**
   * @brief This function handles DMA1 channel 2 and channel 3 interrupts.
   */
 void DMA1_Channel2_3_IRQHandler(void)
@@ -197,6 +213,20 @@ void TIM3_IRQHandler(void)
   /* USER CODE BEGIN TIM3_IRQn 1 */
 
   /* USER CODE END TIM3_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM21 global interrupt.
+  */
+void TIM21_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM21_IRQn 0 */
+
+  /* USER CODE END TIM21_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim21);
+  /* USER CODE BEGIN TIM21_IRQn 1 */
+
+  /* USER CODE END TIM21_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

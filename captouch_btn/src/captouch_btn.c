@@ -27,12 +27,19 @@
 /******************************************************************************
  * Static variables
  *****************************************************************************/
+/* round-robin list of all registered button instances, sharing one TSC peripheral */
+static CAPTOUCH_BTN_st* s_btn_list_head = NULL;
+static CAPTOUCH_BTN_st* s_btn_list_tail = NULL;
+static CAPTOUCH_BTN_st* s_next_to_acquire = NULL;
+
+/* button instance currently being sampled by the TSC (NULL if idle) */
+static CAPTOUCH_BTN_st* s_acquiring_btn = NULL;
 
 /******************************************************************************
  * Static functions
  *****************************************************************************/
 //_____________________________________________________________________________
-static bool CAPTOUCH_BTN_acquire_is_touched(CAPTOUCH_BTN_st* p_btn)
+static void CAPTOUCH_BTN_start_acquisition(CAPTOUCH_BTN_st* p_btn)
 {
     TSC_IOConfigTypeDef io_cfg = {
         .ChannelIOs = p_btn->channel_io,
@@ -42,22 +49,30 @@ static bool CAPTOUCH_BTN_acquire_is_touched(CAPTOUCH_BTN_st* p_btn)
 
     HAL_TSC_IOConfig(p_btn->tsc, &io_cfg);
 
-    if (HAL_TSC_Start(p_btn->tsc) != HAL_OK)
+    s_acquiring_btn = p_btn;
+
+    if (HAL_TSC_Start_IT(p_btn->tsc) != HAL_OK)
     {
-        return false;
+        s_acquiring_btn = NULL;
+    }
+}
+
+//_____________________________________________________________________________
+/* kick off the next pending acquisition (round-robin), if the TSC is idle.
+ * safe to call from both task and ISR context - acquisitions are naturally
+ * serialized via @ref s_acquiring_btn, since only one can run at a time. */
+static void CAPTOUCH_BTN_kick_next_acquisition(void)
+{
+    CAPTOUCH_BTN_st* p_btn = s_next_to_acquire;
+
+    if ((s_acquiring_btn != NULL) || (p_btn == NULL))
+    {
+        return;
     }
 
-    if (HAL_TSC_PollForAcquisition(p_btn->tsc) != HAL_OK)
-    {
-        return false;
-    }
+    s_next_to_acquire = (p_btn->next != NULL) ? p_btn->next : s_btn_list_head;
 
-    if (HAL_TSC_GroupGetStatus(p_btn->tsc, p_btn->group_index) != TSC_GROUP_COMPLETED)
-    {
-        return false;
-    }
-
-    return (HAL_TSC_GroupGetValue(p_btn->tsc, p_btn->group_index) > p_btn->touch_threshold);
+    CAPTOUCH_BTN_start_acquisition(p_btn);
 }
 
 //_____________________________________________________________________________
@@ -137,6 +152,27 @@ CAPTOUCH_BTN_STATUS_t CAPTOUCH_BTN_init(CAPTOUCH_BTN_st* p_btn, CAPTOUCH_BTN_INI
     p_btn->on_long_press = NULL;
     p_btn->long_press_ctx = NULL;
 
+    p_btn->acq_done = false;
+    p_btn->acq_touched = false;
+    p_btn->next = NULL;
+
+    /* append to the round-robin acquisition list */
+    if (s_btn_list_tail == NULL)
+    {
+        s_btn_list_head = p_btn;
+    }
+    else
+    {
+        s_btn_list_tail->next = p_btn;
+    }
+
+    s_btn_list_tail = p_btn;
+
+    if (s_next_to_acquire == NULL)
+    {
+        s_next_to_acquire = p_btn;
+    }
+
     return CAPTOUCH_BTN_STATUS_OK;
 }
 
@@ -173,5 +209,52 @@ void CAPTOUCH_BTN_process(CAPTOUCH_BTN_st* p_btn)
 {
     ASSERT(p_btn != NULL, "null button instance");
 
-    CAPTOUCH_BTN_handle_press_state(p_btn, CAPTOUCH_BTN_acquire_is_touched(p_btn));
+    /* keep the background acquisition chain alive (no-op while one is in flight) */
+    CAPTOUCH_BTN_kick_next_acquisition();
+
+    if (p_btn->acq_done)
+    {
+        p_btn->acq_done = false;
+
+        CAPTOUCH_BTN_handle_press_state(p_btn, p_btn->acq_touched);
+    }
+}
+
+//_____________________________________________________________________________
+/******************************************************************************
+ * HAL TSC callbacks (ISR context)
+ *****************************************************************************/
+//_____________________________________________________________________________
+void HAL_TSC_ConvCpltCallback(TSC_HandleTypeDef* htsc)
+{
+    CAPTOUCH_BTN_st* p_btn = s_acquiring_btn;
+
+    if (p_btn != NULL)
+    {
+        s_acquiring_btn = NULL;
+
+        p_btn->acq_touched = (HAL_TSC_GroupGetStatus(htsc, p_btn->group_index) == TSC_GROUP_COMPLETED)
+                          && (HAL_TSC_GroupGetValue(htsc, p_btn->group_index) > p_btn->touch_threshold);
+        p_btn->acq_done = true;
+    }
+
+    CAPTOUCH_BTN_kick_next_acquisition();
+}
+
+//_____________________________________________________________________________
+void HAL_TSC_ErrorCallback(TSC_HandleTypeDef* htsc)
+{
+    (void)htsc;
+
+    CAPTOUCH_BTN_st* p_btn = s_acquiring_btn;
+
+    if (p_btn != NULL)
+    {
+        s_acquiring_btn = NULL;
+
+        p_btn->acq_touched = false;
+        p_btn->acq_done = true;
+    }
+
+    CAPTOUCH_BTN_kick_next_acquisition();
 }

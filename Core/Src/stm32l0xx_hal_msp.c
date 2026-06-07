@@ -169,7 +169,20 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
     /* USER CODE BEGIN TIM3_MspInit 1 */
 
     /* USER CODE END TIM3_MspInit 1 */
+  }
+  else if(htim_base->Instance==TIM21)
+  {
+    /* USER CODE BEGIN TIM21_MspInit 0 */
 
+    /* USER CODE END TIM21_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM21_CLK_ENABLE();
+    /* TIM21 interrupt Init */
+    HAL_NVIC_SetPriority(TIM21_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TIM21_IRQn);
+    /* USER CODE BEGIN TIM21_MspInit 1 */
+
+    /* USER CODE END TIM21_MspInit 1 */
   }
 
 }
@@ -274,6 +287,20 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
 
     /* USER CODE END TIM3_MspDeInit 1 */
   }
+  else if(htim_base->Instance==TIM21)
+  {
+    /* USER CODE BEGIN TIM21_MspDeInit 0 */
+
+    /* USER CODE END TIM21_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM21_CLK_DISABLE();
+
+    /* TIM21 interrupt DeInit */
+    HAL_NVIC_DisableIRQ(TIM21_IRQn);
+    /* USER CODE BEGIN TIM21_MspDeInit 1 */
+
+    /* USER CODE END TIM21_MspDeInit 1 */
+  }
 
 }
 
@@ -315,6 +342,9 @@ void HAL_TSC_MspInit(TSC_HandleTypeDef* htsc)
     GPIO_InitStruct.Alternate = GPIO_AF3_TSC;
     HAL_GPIO_Init(TSC_SAMPLE_GPIO_Port, &GPIO_InitStruct);
 
+    /* TSC interrupt Init */
+    HAL_NVIC_SetPriority(TSC_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TSC_IRQn);
     /* USER CODE BEGIN TSC_MspInit 1 */
 
     /* USER CODE END TSC_MspInit 1 */
@@ -347,6 +377,8 @@ void HAL_TSC_MspDeInit(TSC_HandleTypeDef* htsc)
     */
     HAL_GPIO_DeInit(GPIOA, TSC_LIGHT_Pin|TSC_MUSIC_Pin|TSC_MODE_Pin|TSC_SAMPLE_Pin);
 
+    /* TSC interrupt DeInit */
+    HAL_NVIC_DisableIRQ(TSC_IRQn);
     /* USER CODE BEGIN TSC_MspDeInit 1 */
 
     /* USER CODE END TSC_MspDeInit 1 */

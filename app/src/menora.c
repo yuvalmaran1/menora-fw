@@ -23,6 +23,8 @@
 
 #define MENORA_TSC_TOUCH_THRESHOLD  (1200)  // acquisition count above which an electrode is considered touched
 
+#define MENORA_BTN_READOUT_INTERVAL_MS  (10)
+
 /******************************************************************************
  * Data types
  *****************************************************************************/
@@ -31,6 +33,8 @@ typedef struct
     CAPTOUCH_BTN_st light_btn;
     CAPTOUCH_BTN_st music_btn;
     CAPTOUCH_BTN_st mode_btn;
+
+    MS_SCHEDULER_SLOT_t* btn_readout_slot;
 } MENORA_st;
 
 /******************************************************************************
@@ -55,6 +59,16 @@ static void MENORA_btn_long_press_cb(void* ctx)
     const char* btn_name = (const char*)ctx;
 
     RTT_LOG_log(RTT_INFO, MENORA_LOG_SOURCE, "%s button - long press", btn_name);
+}
+
+//_____________________________________________________________________________
+static void MENORA_btn_readout_task(void* ctx)
+{
+    (void)ctx;
+
+    CAPTOUCH_BTN_process(&s_menora.light_btn);
+    CAPTOUCH_BTN_process(&s_menora.music_btn);
+    CAPTOUCH_BTN_process(&s_menora.mode_btn);
 }
 
 //_____________________________________________________________________________
@@ -107,6 +121,17 @@ void MENORA_init(MENORA_INIT_CONFIG_st* p_init_config)
     MENORA_captouch_btn_init(&s_menora.music_btn, "Music", p_init_config, p_init_config->tsc_music_btn_channel_io);
     MENORA_captouch_btn_init(&s_menora.mode_btn, "Mode", p_init_config, p_init_config->tsc_mode_btn_channel_io);
 
+    RTT_LOG_log(RTT_INFO, MENORA_LOG_SOURCE, "Initializing scheduler");
+
+    MS_SCHEDULER_INIT_CONFIG_st scheduler_cfg = {
+        .timer = p_init_config->scheduler_tim
+    };
+
+    MS_SCHEDULER_init(&scheduler_cfg);
+
+    s_menora.btn_readout_slot = MS_SCHEDULER_allocate_slot();
+    MS_SCHEDULER_schedule(s_menora.btn_readout_slot, MENORA_btn_readout_task, NULL, MENORA_BTN_READOUT_INTERVAL_MS, true);
+
     RTT_LOG_log(RTT_INFO, MENORA_LOG_SOURCE, "Menora initialization complete");
 }
 
@@ -114,8 +139,4 @@ void MENORA_init(MENORA_INIT_CONFIG_st* p_init_config)
 void MENORA_process(void)
 {
     TASK_HANDLER_handle();
-
-    CAPTOUCH_BTN_process(&s_menora.light_btn);
-    CAPTOUCH_BTN_process(&s_menora.music_btn);
-    CAPTOUCH_BTN_process(&s_menora.mode_btn);
 }

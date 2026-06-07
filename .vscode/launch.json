@@ -6,13 +6,13 @@
     "configurations": [
         {
             "cwd": "${workspaceFolder}",
-            "executable": "./build/Debug/menora-sw.elf",
+            "executable": "./build/Debug/MENORA.elf",
             "name": "Debug with JLink",
             "request": "launch",
             "type": "cortex-debug",
             "device": "STM32L072CB",
             "runToEntryPoint": "main",
-            "showDevDebugOutput": "none",
+            "showDevDebugOutput": "raw",
             "servertype": "jlink",
             "interface": "swd",
             "rttConfig": {

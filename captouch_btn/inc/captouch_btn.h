@@ -68,7 +68,9 @@ typedef struct
 } CAPTOUCH_BTN_INIT_CONFIG_st;
 
 /*!< instance context */
-typedef struct
+typedef struct CAPTOUCH_BTN_s CAPTOUCH_BTN_st;
+
+struct CAPTOUCH_BTN_s
 {
     TSC_HandleTypeDef* tsc;
     uint32_t group_index;
@@ -85,7 +87,12 @@ typedef struct
 
     CAPTOUCH_BTN_callback_t on_long_press;
     void* long_press_ctx;
-} CAPTOUCH_BTN_st;
+
+    /* internal - background TSC acquisition (interrupt-driven, round-robin across instances) */
+    volatile bool acq_done;     // true once a fresh acquisition result is available to harvest
+    volatile bool acq_touched;  // latest harvested acquisition result
+    CAPTOUCH_BTN_st* next;      // intrusive link for round-robin acquisition scheduling
+};
 
 /******************************************************************************
  * Public function prototypes
@@ -126,13 +133,14 @@ CAPTOUCH_BTN_STATUS_t CAPTOUCH_BTN_register_short_press_cb(CAPTOUCH_BTN_st* p_bt
 CAPTOUCH_BTN_STATUS_t CAPTOUCH_BTN_register_long_press_cb(CAPTOUCH_BTN_st* p_btn, CAPTOUCH_BTN_callback_t cb, void* ctx);
 
 /***************************************************************************//**
- * Process button internals - acquires a touch sample for this button's
- * electrode and runs the press state machine
+ * Process button internals - harvests the latest touch sample for this
+ * button's electrode and runs the press state machine
  *
- * @note This function should be called periodically (e.g. from the main loop).
- *       Since all buttons in a group share the same TSC sampling IO, only one
- *       button per group may acquire at a time - calling this sequentially for
- *       each instance naturally serializes the acquisitions.
+ * @note This function should be called periodically (e.g. from the main loop
+ *       or a scheduled task) and never blocks. Acquisition itself happens in
+ *       the background, driven by TSC interrupts: all button instances created
+ *       via @ref CAPTOUCH_BTN_init share the same TSC peripheral and are
+ *       sampled one at a time in a round-robin fashion.
  *
  * @param[in] p_btn button instance
  *
