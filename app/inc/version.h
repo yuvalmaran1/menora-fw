@@ -12,7 +12,7 @@
 /******************************************************************************
  * Project version constants
  *****************************************************************************/
-#define PROJECT_VERSION_MAJOR @MENORA_VERSION_MAJOR@
-#define PROJECT_VERSION_MINOR @MENORA_VERSION_MINOR@
-#define PROJECT_VERSION_PATCH @MENORA_VERSION_PATCH@
-#define PROJECT_VERSION "@MENORA_VERSION@"
+#define PROJECT_VERSION_MAJOR 1
+#define PROJECT_VERSION_MINOR 0
+#define PROJECT_VERSION_PATCH 0
+#define PROJECT_VERSION "1.0.0"

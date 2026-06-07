@@ -18,14 +18,21 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
+include("app/cmake/app.cmake")
+include("util/cmake/util.cmake")
+include("ledstrip/cmake/ledstrip.cmake")
+
 # Set the project name
-set(CMAKE_PROJECT_NAME menora-sw)
+set(CMAKE_PROJECT_NAME MENORA)
 
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 # Core project settings
-project(${CMAKE_PROJECT_NAME})
+project(${CMAKE_PROJECT_NAME} VERSION 1.0.0)
+set(PROJECT_VERSION_DEV 1)
+
+message("Building " ${CMAKE_PROJECT_NAME} " Version: " ${PROJECT_VERSION} " Dev: " ${PROJECT_VERSION_DEV})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Enable CMake support for ASM and C languages
@@ -36,6 +43,10 @@ add_executable(${CMAKE_PROJECT_NAME})
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
+
+add_app(${CMAKE_PROJECT_NAME})
+add_util(${CMAKE_PROJECT_NAME})
+add_ledstrip(${CMAKE_PROJECT_NAME})
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE

@@ -31,23 +31,9 @@ function(add_app TARGET_NAME)
 
     target_sources(
         ${TARGET_NAME} PRIVATE
-        "${APP_DIR}/src/irr_node.c"
-        "${APP_DIR}/src/irr_scheduler.c"
-        "${APP_DIR}/src/irr_lora.c"
-        "${APP_DIR}/src/irr_nfc.c"
-        "${APP_DIR}/src/irr_cli.c"
-        "${APP_DIR}/src/irr_debug.c"
-        "${APP_DIR}/src/irr_pwr.c"
-        "${APP_DIR}/src/irr_fwu.c"
-        "${APP_DIR}/src/irr_lora_msg.c"
-        "${APP_DIR}/src/flash_if.c"
-        "${APP_DIR}/src/frag_decoder_if.c"
-        "${APP_DIR}/src/fw_update_agent.c"
-        "${APP_DIR}/../Middlewares/Third_Party/LoRaWAN/LmHandler/Packages/LmhpClockSync.c"
-        "${APP_DIR}/../Middlewares/Third_Party/LoRaWAN/LmHandler/Packages/LmhpRemoteMcastSetup.c"
-        "${APP_DIR}/../Middlewares/Third_Party/LoRaWAN/LmHandler/Packages/LmhpFragmentation.c"
-        "${APP_DIR}/../Middlewares/Third_Party/LoRaWAN/LmHandler/Packages/FragDecoder.c"
-        "${APP_DIR}/../Middlewares/Third_Party/LoRaWAN/LmHandler/Packages/LmhpFirmwareManagement.c"
+        "${APP_DIR}/src/menora.c"
     )
+
+    configure_file(${APP_CMAKE_DIR}/version.h.in ${APP_DIR}/inc/version.h @ONLY)
 
 endfunction()

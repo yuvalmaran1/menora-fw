@@ -4,6 +4,8 @@ function(add_ledstrip TARGET_NAME)
 
     set(LEDSTRIP_DIR "${LEDSTRIP_CMAKE_DIR}/..")
 
+    message(STATUS "adding ledstrip to target ${TARGET_NAME}")
+
     target_compile_definitions(
         ${TARGET_NAME} PRIVATE
     )
