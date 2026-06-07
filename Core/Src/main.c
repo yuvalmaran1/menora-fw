@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "menora.h"
 
 /* USER CODE END Includes */
 
@@ -72,7 +73,26 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  MENORA_INIT_CONFIG_st menora_cfg = {
+      .scheduler_tim = &htim3,
+      .led_tim = &htim21,
+      .led_data_port = LED_DATA_EN_GPIO_Port,
+      .led_data_pin = LED_DATA_EN_Pin,
+      .led_en_port = LED_DATA_EN_GPIO_Port,
+      .led_en_pin = LED_DATA_EN_Pin,
+      .id0_port = ID0_GPIO_Port,
+      .id0_pin = ID0_Pin,
+      .id1_port = ID1_GPIO_Port,
+      .id1_pin = ID1_Pin,
+      .id2_port = ID2_GPIO_Port,
+      .id2_pin = ID2_Pin,
+      .light_btn_port = TSC_LIGHT_GPIO_Port,
+      .light_btn_pin = TSC_LIGHT_Pin,
+      .music_btn_port = TSC_MUSIC_GPIO_Port,
+      .music_btn_pin = TSC_MUSIC_Pin,
+      .mode_btn_port = TSC_MODE_GPIO_Port,
+      .mode_btn_pin = TSC_MODE_Pin
+  };
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -97,7 +117,7 @@ int main(void)
   MX_TSC_Init();
   MX_TIM21_Init();
   /* USER CODE BEGIN 2 */
-
+  MENORA_init(&menora_cfg);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -107,6 +127,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    MENORA_process();
   }
   /* USER CODE END 3 */
 }
