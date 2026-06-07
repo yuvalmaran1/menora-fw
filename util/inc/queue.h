@@ -17,7 +17,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "ctosal.h"
+#include "osal.h"
+#include "assert.h"
 
 //***************************************************************************//
 // Constants & Macros                                                        //
@@ -44,21 +45,21 @@
 #define QUEUE_INIT(qName)                                                   \
     do                                                                      \
     {                                                                       \
-        CTOSAL_critical_section_enter();                                    \
+        OSAL_critical_section_enter();                                    \
         memset(qName.fifo, 0, sizeof(qName.fifo));                          \
         qName.head = 0,                                                     \
         qName.tail = 0,                                                     \
         qName.used = 0,                                                     \
         qName.size = sizeof(qName.fifo)/                                    \
                      sizeof(qName.fifo[0]);                                 \
-        CTOSAL_critical_section_exit();                                     \
+        OSAL_critical_section_exit();                                     \
     } while(0);
 
 //_____________________________________________________________________________
 #define QUEUE_ENQUEUE(qName, item)                                          \
     do                                                                      \
     {                                                                       \
-        CTOSAL_critical_section_enter();                                    \
+        OSAL_critical_section_enter();                                    \
         if (qName.used < qName.size)                                        \
         {                                                                   \
             memcpy((void*)&qName.fifo[qName.head],                          \
@@ -69,16 +70,16 @@
         }                                                                   \
         else                                                                \
         {                                                                   \
-            CTOSAL_ASSERT(0, "Queue overflow");         	                \
+            ASSERT(0, "Queue overflow");         	                \
         }                                                                   \
-        CTOSAL_critical_section_exit();                                     \
+        OSAL_critical_section_exit();                                     \
     }while(0);
 
 //_____________________________________________________________________________
 #define QUEUE_ENQUEUE_MULTI(qName, items, amount)                           \
     do                                                                      \
     {                                                                       \
-        CTOSAL_critical_section_enter();                                    \
+        OSAL_critical_section_enter();                                    \
         if (qName.used + amount <= qName.size)                              \
         {                                                                   \
             uint32_t items_left = amount;                                   \
@@ -104,9 +105,9 @@
         }                                                                   \
         else                                                                \
         {                                                                   \
-          CTOSAL_ASSERT(0, "Queue overflow");                               \
+          ASSERT(0, "Queue overflow");                               \
         }                                                                   \
-        CTOSAL_critical_section_exit();                                     \
+        OSAL_critical_section_exit();                                     \
     }while(0);
 
 
@@ -114,7 +115,7 @@
 #define QUEUE_DEQUEUE(qName, item)                                          \
     do                                                                      \
     {                                                                       \
-        CTOSAL_critical_section_enter();                                    \
+        OSAL_critical_section_enter();                                    \
         if (qName.used > 0)                                                 \
         {                                                                   \
             memcpy((void*)&item,                                            \
@@ -125,16 +126,16 @@
         }                                                                   \
         else                                                                \
         {                                                                   \
-            CTOSAL_ASSERT(0, "Queue underflow");        	                \
+            ASSERT(0, "Queue underflow");        	                \
         }                                                                   \
-        CTOSAL_critical_section_exit();                                     \
+        OSAL_critical_section_exit();                                     \
     } while(0);
 
 //_____________________________________________________________________________
 #define QUEUE_DEQUEUE_MULTI(qName, items, amount)                           \
     do                                                                      \
     {                                                                       \
-        CTOSAL_critical_section_enter();                                    \
+        OSAL_critical_section_enter();                                    \
         if ((qName.used > 0) && (qName.used >= amount))                     \
         {                                                                   \
             uint32_t items_left = amount;                                   \
@@ -160,9 +161,9 @@
         }                                                                   \
         else                                                                \
         {                                                                   \
-          CTOSAL_ASSERT(0, "Queue underflow");                              \
+          ASSERT(0, "Queue underflow");                              \
         }                                                                   \
-        CTOSAL_critical_section_exit();                                     \
+        OSAL_critical_section_exit();                                     \
     } while(0);
 
 

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(brew list *)",
-      "Bash(brew search *)"
+      "Bash(brew search *)",
+      "Bash(xargs ls)"
     ]
   }
 }

@@ -13,6 +13,7 @@
 #include <string.h>
 #include "ledstrip.h"
 #include "stm32l0xx.h"
+#include "osal.h"
 
 
 /******************************************************************************
@@ -76,6 +77,7 @@ typedef struct
     bool first_update;
     uint32_t last_update;
     uint32_t counter;
+    volatile bool dma_done;
     LEDSTRIP_BRIGHTNESS_en brightness;
     LEDSTRIP_LED_CONFIG_st led_config[LEDSTRIP_NUM_DEVICES];
     uint32_t dummy[100];
@@ -111,11 +113,23 @@ static LEDSTRIP_st s_ledstrip = {0};
  * Static functions
  *****************************************************************************/
 //_____________________________________________________________________________
+static void LEDSTRIP_lock(void)
+{
+    OSAL_critical_section_enter();
+}
+
+//_____________________________________________________________________________
+static void LEDSTRIP_unlock(void)
+{
+    OSAL_critical_section_exit();
+}
+
+//_____________________________________________________________________________
 void LEDSTRIP_timer_cb(TIM_HandleTypeDef *htim)
 {
     (void)htim;
 
-    CTOSAL_semaphore_give(s_ledstrip.sem);
+    s_ledstrip.dma_done = true;
 }
 
 //_____________________________________________________________________________
@@ -210,24 +224,23 @@ static void LEDSTRIP_encode_all(uint32_t counter)
 LEDSTRIP_STATUS_t LEDSTRIP_init(LEDSTRIP_INIT_CONFIG_st* p_init_config)
 {
     LEDSTRIP_STATUS_t status = LEDSTRIP_STATUS_OK;
-    CTOSAL_SEM_CONFIG_t sem_cfg = {
-        .initial_count = 0,
-        .max_count = 1,
-    };
 
     /* initialize context struct */
     s_ledstrip.gpio_led_data = p_init_config->gpio_led_data;
+    s_ledstrip.gpio_led_data_pin = p_init_config->gpio_led_data_pin;
     s_ledstrip.gpio_led_en = p_init_config->gpio_led_en;
+    s_ledstrip.gpio_led_en_pin = p_init_config->gpio_led_en_pin;
     s_ledstrip.tim = p_init_config->tim;
     s_ledstrip.tim_ch = p_init_config->tim_ch;
     s_ledstrip.brightness = p_init_config->brightness;
     s_ledstrip.first_update = true;
-    s_ledstrip.last_update = CTOSAL_time_get_ms();
+    s_ledstrip.last_update = HAL_GetTick();
     s_ledstrip.counter = 0;
-        
-    HAL_TIM_RegisterCallback(s_ledstrip.tim->handle, HAL_TIM_PWM_PULSE_FINISHED_CB_ID, LEDSTRIP_timer_cb);
-    
-    CTHAL_GPIO_write(s_ledstrip.gpio_led_data, CTHAL_GPIO_VAL_RESET);
+    s_ledstrip.dma_done = false;
+
+    HAL_TIM_RegisterCallback(s_ledstrip.tim, HAL_TIM_PWM_PULSE_FINISHED_CB_ID, LEDSTRIP_timer_cb);
+
+    HAL_GPIO_WritePin(s_ledstrip.gpio_led_data, s_ledstrip.gpio_led_data_pin, GPIO_PIN_RESET);
 
     return status;
 }
@@ -282,7 +295,7 @@ void LEDSTRIP_process(void)
 {
     uint32_t timetag;
 
-    timetag = CTOSAL_time_get_ms();
+    timetag = HAL_GetTick();
 
     if (s_ledstrip.first_update)
     {
@@ -299,20 +312,24 @@ void LEDSTRIP_process(void)
         /* encode leds */
         LEDSTRIP_encode_all(s_ledstrip.counter);
 
-        
-        CTHAL_GPIO_write(s_ledstrip.gpio_led_en, CTHAL_GPIO_VAL_SET);
+
+        HAL_GPIO_WritePin(s_ledstrip.gpio_led_en, s_ledstrip.gpio_led_en_pin, GPIO_PIN_SET);
 
         /* initiate transmission */
-        if (HAL_OK == HAL_TIM_PWM_Start_DMA(s_ledstrip.tim->handle, s_ledstrip.tim_ch, (uint32_t*)s_ledstrip.dummy, sizeof(uint32_t)*(100+LEDSTRIP_BUF_LEN)))
+        s_ledstrip.dma_done = false;
+
+        if (HAL_OK == HAL_TIM_PWM_Start_DMA(s_ledstrip.tim, s_ledstrip.tim_ch, (uint32_t*)s_ledstrip.dummy, sizeof(uint32_t)*(100+LEDSTRIP_BUF_LEN)))
         {
             /* wait for completion */
-            CTOSAL_semaphore_take(s_ledstrip.sem, CTOSAL_TIMEOUT_FOREVER);
-            // CTOSAL_time_delay_ms(1);
-             /* stop transmission */
-            HAL_TIM_PWM_Stop_DMA(s_ledstrip.tim->handle, s_ledstrip.tim_ch);           
+            while (!s_ledstrip.dma_done)
+            {
+            }
+
+            /* stop transmission */
+            HAL_TIM_PWM_Stop_DMA(s_ledstrip.tim, s_ledstrip.tim_ch);
         }
 
-        CTHAL_GPIO_write(s_ledstrip.gpio_led_en, CTHAL_GPIO_VAL_RESET);
+        HAL_GPIO_WritePin(s_ledstrip.gpio_led_en, s_ledstrip.gpio_led_en_pin, GPIO_PIN_RESET);
     }
 }
 

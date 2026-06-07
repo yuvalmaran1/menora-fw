@@ -49,6 +49,14 @@ typedef struct
 
     GPIO_TypeDef* mode_btn_port;
     uint16_t mode_btn_pin;
+
+    TSC_HandleTypeDef* tsc;
+
+    uint32_t tsc_light_btn_channel_io;
+    uint32_t tsc_music_btn_channel_io;
+    uint32_t tsc_mode_btn_channel_io;
+    uint32_t tsc_btn_group_index;
+    uint32_t tsc_btn_sampling_io;
 } MENORA_INIT_CONFIG_st;
 
 /******************************************************************************
@@ -68,3 +76,5 @@ void MENORA_init(MENORA_INIT_CONFIG_st* p_init_config);
  * @note This function should be called in an infinite loop
  ******************************************************************************/
  void MENORA_process(void);
+
+#endif // MENORA_H_

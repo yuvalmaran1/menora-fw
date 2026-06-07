@@ -57,7 +57,7 @@ bool TASK_HANDLER_handle(void)
         QUEUE_DEQUEUE(task_queue, task);
 
         // check for null pointer
-        CTOSAL_ASSERT(task.task, "NULL task");
+        ASSERT(task.task, "NULL task");
 
         // execute
         task.task(task.context);

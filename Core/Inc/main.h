@@ -67,6 +67,10 @@ void Error_Handler(void);
 #define TSC_MODE_GPIO_Port GPIOA
 #define TSC_SAMPLE_Pin GPIO_PIN_3
 #define TSC_SAMPLE_GPIO_Port GPIOA
+#define LED_DATA_Pin GPIO_PIN_5
+#define LED_DATA_GPIO_Port GPIOA
+#define BUZZER_Pin GPIO_PIN_1
+#define BUZZER_GPIO_Port GPIOB
 #define ID2_Pin GPIO_PIN_2
 #define ID2_GPIO_Port GPIOB
 #define ID1_Pin GPIO_PIN_10
@@ -75,8 +79,6 @@ void Error_Handler(void);
 #define ID0_GPIO_Port GPIOB
 #define LED_DATA_EN_Pin GPIO_PIN_13
 #define LED_DATA_EN_GPIO_Port GPIOB
-#define LED_DATA_Pin GPIO_PIN_14
-#define LED_DATA_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

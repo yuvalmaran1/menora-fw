@@ -16,7 +16,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "task_handler.h"
-#include "cthal_tim.h"
+#include "stm32l0xx_hal.h"
 
 //***************************************************************************//
 // Constants & Macros                                                        //
@@ -35,7 +35,7 @@ typedef struct MS_SCHEDULER_SLOT_s MS_SCHEDULER_SLOT_t;
 /*!< initial configuration */
 typedef struct
 {
-    CTHAL_TIM_HANDLE_t* timer;
+    TIM_HandleTypeDef* timer;
 } MS_SCHEDULER_INIT_CONFIG_st;
 
 //***************************************************************************//

@@ -1,10 +1,10 @@
-set(UTIL_CMAKE_DIR ${CMAKE_CURRENT_LIST_DIR})
+set(CAPTOUCH_BTN_CMAKE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
-function(add_util TARGET_NAME)
+function(add_captouch_btn TARGET_NAME)
 
-    set(UTIL_DIR "${UTIL_CMAKE_DIR}/..")
+    set(CAPTOUCH_BTN_DIR "${CAPTOUCH_BTN_CMAKE_DIR}/..")
 
-    message(STATUS "adding util to target ${TARGET_NAME}")
+    message(STATUS "adding captouch_btn to target ${TARGET_NAME}")
 
     target_compile_definitions(
         ${TARGET_NAME} PRIVATE
@@ -12,7 +12,7 @@ function(add_util TARGET_NAME)
 
     target_include_directories(
         ${TARGET_NAME} PRIVATE
-        "${UTIL_DIR}/inc"
+        "${CAPTOUCH_BTN_DIR}/inc"
     )
 
     target_compile_options(
@@ -33,12 +33,7 @@ function(add_util TARGET_NAME)
 
     target_sources(
         ${TARGET_NAME} PRIVATE
-        "${UTIL_DIR}/src/ms_scheduler.c"
-        "${UTIL_DIR}/src/scheduler.c"
-        "${UTIL_DIR}/src/task_handler.c"
-        "${UTIL_DIR}/src/list.c"
-        "${UTIL_DIR}/src/ptr_queue.c"
-        "${UTIL_DIR}/src/osal.c"
+        "${CAPTOUCH_BTN_DIR}/src/captouch_btn.c"
     )
 
 endfunction()

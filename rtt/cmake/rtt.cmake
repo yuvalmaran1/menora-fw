@@ -1,10 +1,10 @@
-set(UTIL_CMAKE_DIR ${CMAKE_CURRENT_LIST_DIR})
+set(RTT_CMAKE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
-function(add_util TARGET_NAME)
+function(add_rtt TARGET_NAME)
 
-    set(UTIL_DIR "${UTIL_CMAKE_DIR}/..")
+    set(RTT_DIR "${RTT_CMAKE_DIR}/..")
 
-    message(STATUS "adding util to target ${TARGET_NAME}")
+    message(STATUS "adding rtt to target ${TARGET_NAME}")
 
     target_compile_definitions(
         ${TARGET_NAME} PRIVATE
@@ -12,7 +12,7 @@ function(add_util TARGET_NAME)
 
     target_include_directories(
         ${TARGET_NAME} PRIVATE
-        "${UTIL_DIR}/inc"
+        "${RTT_DIR}/inc"
     )
 
     target_compile_options(
@@ -33,12 +33,10 @@ function(add_util TARGET_NAME)
 
     target_sources(
         ${TARGET_NAME} PRIVATE
-        "${UTIL_DIR}/src/ms_scheduler.c"
-        "${UTIL_DIR}/src/scheduler.c"
-        "${UTIL_DIR}/src/task_handler.c"
-        "${UTIL_DIR}/src/list.c"
-        "${UTIL_DIR}/src/ptr_queue.c"
-        "${UTIL_DIR}/src/osal.c"
+        # "${RTT_DIR}/src/SEGGER_RTT_Syscalls_GCC.c"
+        "${RTT_DIR}/src/SEGGER_RTT.c"
+        "${RTT_DIR}/src/SEGGER_RTT_printf.c"
+        "${RTT_DIR}/src/rtt_log.c"
     )
 
 endfunction()

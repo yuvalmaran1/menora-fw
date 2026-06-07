@@ -21,7 +21,7 @@
 //***************************************************************************//
 typedef struct
 {
-    CTHAL_TIM_HANDLE_t* timer;
+    TIM_HandleTypeDef*  timer;
     SCHEDULER_st        scheduler;
     LIST_ITEM_st        list_buffer[MS_SCHEDULER_NUM_SLOTS];
     void*               queue_buffer[MS_SCHEDULER_NUM_SLOTS];
@@ -38,10 +38,9 @@ static MS_SCHEDULER_st s_ms_scheduler = {0};
 // Static Functions                                                          //
 //***************************************************************************//
 //_____________________________________________________________________________
-void MS_SCHEDULER_timer_handler(CTHAL_TIM_HANDLE_t* handle, void* context)
+void MS_SCHEDULER_timer_handler(TIM_HandleTypeDef* handle)
 {
     (void)handle;
-    (void)context;
 
 	SCHEDULER_tick(&s_ms_scheduler.scheduler);
 }
@@ -63,10 +62,10 @@ void MS_SCHEDULER_init(MS_SCHEDULER_INIT_CONFIG_st* p_init_config)
                     MS_SCHEDULER_NUM_SLOTS);
 
     /* register the callback */
-    CTHAL_TIM_register_callback(s_ms_scheduler.timer, MS_SCHEDULER_timer_handler);
+    HAL_TIM_RegisterCallback(s_ms_scheduler.timer, HAL_TIM_PERIOD_ELAPSED_CB_ID, MS_SCHEDULER_timer_handler);
 
     /* start timer */
-    CTHAL_TIM_start(s_ms_scheduler.timer);
+    HAL_TIM_Base_Start_IT(s_ms_scheduler.timer);
 }
 
 //_____________________________________________________________________________
@@ -74,11 +73,11 @@ void MS_SCHEDULER_pause(bool pause)
 {
     if (pause)
     {
-        CTHAL_TIM_stop(s_ms_scheduler.timer);
+        HAL_TIM_Base_Stop_IT(s_ms_scheduler.timer);
     }
     else
     {
-        CTHAL_TIM_start(s_ms_scheduler.timer);
+        HAL_TIM_Base_Start_IT(s_ms_scheduler.timer);
     }
 }
 

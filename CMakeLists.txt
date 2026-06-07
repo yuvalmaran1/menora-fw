@@ -21,6 +21,8 @@ endif()
 include("app/cmake/app.cmake")
 include("util/cmake/util.cmake")
 include("ledstrip/cmake/ledstrip.cmake")
+include("rtt/cmake/rtt.cmake")
+include("captouch_btn/cmake/captouch_btn.cmake")
 
 # Set the project name
 set(CMAKE_PROJECT_NAME MENORA)
@@ -47,6 +49,8 @@ add_subdirectory(cmake/stm32cubemx)
 add_app(${CMAKE_PROJECT_NAME})
 add_util(${CMAKE_PROJECT_NAME})
 add_ledstrip(${CMAKE_PROJECT_NAME})
+add_rtt(${CMAKE_PROJECT_NAME})
+add_captouch_btn(${CMAKE_PROJECT_NAME})
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE

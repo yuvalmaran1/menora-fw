@@ -14,7 +14,18 @@
             "runToEntryPoint": "main",
             "showDevDebugOutput": "none",
             "servertype": "jlink",
-            "interface": "swd"
+            "interface": "swd",
+            "rttConfig": {
+                "enabled": true,
+                "address": "auto",
+                "decoders": [
+                    {
+                        "label": "RTT",
+                        "port": 0,
+                        "type": "console"
+                    }
+                ]
+            }
         }
     ]
 }
