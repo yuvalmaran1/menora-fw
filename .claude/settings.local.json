@@ -3,7 +3,9 @@
     "allow": [
       "Bash(brew list *)",
       "Bash(brew search *)",
-      "Bash(xargs ls)"
+      "Bash(xargs ls)",
+      "Bash(TC=\"/Users/yuval/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin\" *)",
+      "Read(//Users/yuval/Library/Application Support/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin/**)"
     ]
   }
 }

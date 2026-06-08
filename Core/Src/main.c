@@ -81,8 +81,10 @@ int main(void)
   MENORA_INIT_CONFIG_st menora_cfg = {
       .scheduler_tim = &htim21,
       .led_tim = &htim2,
-      .led_data_port = LED_DATA_EN_GPIO_Port,
-      .led_data_pin = LED_DATA_EN_Pin,
+      .led_tim_ch = TIM_CHANNEL_1,
+      .buzzer_tim = &htim3,
+      .led_data_port = LED_DATA_GPIO_Port,
+      .led_data_pin = LED_DATA_Pin,
       .led_en_port = LED_DATA_EN_GPIO_Port,
       .led_en_pin = LED_DATA_EN_Pin,
       .id0_port = ID0_GPIO_Port,
@@ -209,7 +211,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 65535;
+  htim2.Init.Period = 39;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)

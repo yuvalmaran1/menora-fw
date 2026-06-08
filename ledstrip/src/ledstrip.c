@@ -129,6 +129,11 @@ void LEDSTRIP_timer_cb(TIM_HandleTypeDef *htim)
 {
     (void)htim;
 
+    /* stop transmission */
+    HAL_TIM_PWM_Stop_DMA(s_ledstrip.tim, s_ledstrip.tim_ch);
+    
+    HAL_GPIO_WritePin(s_ledstrip.gpio_led_en, s_ledstrip.gpio_led_en_pin, GPIO_PIN_RESET);
+
     s_ledstrip.dma_done = true;
 }
 
@@ -240,6 +245,8 @@ LEDSTRIP_STATUS_t LEDSTRIP_init(LEDSTRIP_INIT_CONFIG_st* p_init_config)
 
     HAL_TIM_RegisterCallback(s_ledstrip.tim, HAL_TIM_PWM_PULSE_FINISHED_CB_ID, LEDSTRIP_timer_cb);
 
+    HAL_GPIO_WritePin(s_ledstrip.gpio_led_en, s_ledstrip.gpio_led_en_pin, GPIO_PIN_RESET);
+
     HAL_GPIO_WritePin(s_ledstrip.gpio_led_data, s_ledstrip.gpio_led_data_pin, GPIO_PIN_RESET);
 
     return status;
@@ -312,7 +319,6 @@ void LEDSTRIP_process(void)
         /* encode leds */
         LEDSTRIP_encode_all(s_ledstrip.counter);
 
-
         HAL_GPIO_WritePin(s_ledstrip.gpio_led_en, s_ledstrip.gpio_led_en_pin, GPIO_PIN_SET);
 
         /* initiate transmission */
@@ -320,16 +326,8 @@ void LEDSTRIP_process(void)
 
         if (HAL_OK == HAL_TIM_PWM_Start_DMA(s_ledstrip.tim, s_ledstrip.tim_ch, (uint32_t*)s_ledstrip.dummy, sizeof(uint32_t)*(100+LEDSTRIP_BUF_LEN)))
         {
-            /* wait for completion */
-            while (!s_ledstrip.dma_done)
-            {
-            }
-
-            /* stop transmission */
-            HAL_TIM_PWM_Stop_DMA(s_ledstrip.tim, s_ledstrip.tim_ch);
+            s_ledstrip.dma_done = true; // in case of error, avoid hanging the system - just skip the update   
         }
-
-        HAL_GPIO_WritePin(s_ledstrip.gpio_led_en, s_ledstrip.gpio_led_en_pin, GPIO_PIN_RESET);
     }
 }
 

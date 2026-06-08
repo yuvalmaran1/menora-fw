@@ -25,9 +25,11 @@ typedef struct
 {
     TIM_HandleTypeDef*  scheduler_tim;
     TIM_HandleTypeDef*  led_tim;
-    
+    TIM_HandleTypeDef*  buzzer_tim;
+
     GPIO_TypeDef* led_data_port;
     uint16_t led_data_pin;
+    uint32_t led_tim_ch;
 
     GPIO_TypeDef* led_en_port;
     uint16_t led_en_pin;

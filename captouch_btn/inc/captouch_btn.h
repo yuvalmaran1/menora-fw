@@ -24,7 +24,7 @@
 #endif
 
 #if !defined(CAPTOUCH_BTN_LONG_PRESS_MIN_MS)
-    #define CAPTOUCH_BTN_LONG_PRESS_MIN_MS      (3000)  // min hold duration recognized as a long press
+    #define CAPTOUCH_BTN_LONG_PRESS_MIN_MS      (2000)  // min hold duration recognized as a long press
 #endif
 
 /******************************************************************************

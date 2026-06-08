@@ -24,8 +24,8 @@
 #endif
 
 #if !defined(LEDSTRIP_0H) || !defined(LEDSTRIP_1H)
-    #define LEDSTRIP_0H             (30)       // number of timer high counts for logic 0 
-    #define LEDSTRIP_1H             (60)       // number of timer high counts for logic 1
+    #define LEDSTRIP_0H             (11)       // number of timer high counts for logic 0 
+    #define LEDSTRIP_1H             (22)       // number of timer high counts for logic 1
 #endif
 
 #define LEDSTRIP_COLOR_LIST(COLOR) \
