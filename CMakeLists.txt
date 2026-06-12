@@ -24,6 +24,7 @@ include("ledstrip/cmake/ledstrip.cmake")
 include("rtt/cmake/rtt.cmake")
 include("captouch_btn/cmake/captouch_btn.cmake")
 include("buzzer/cmake/buzzer.cmake")
+include("theme/cmake/theme.cmake")
 
 # Set the project name
 set(CMAKE_PROJECT_NAME MENORA)
@@ -53,6 +54,7 @@ add_ledstrip(${CMAKE_PROJECT_NAME})
 add_rtt(${CMAKE_PROJECT_NAME})
 add_captouch_btn(${CMAKE_PROJECT_NAME})
 add_buzzer(${CMAKE_PROJECT_NAME})
+add_theme(${CMAKE_PROJECT_NAME})
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
