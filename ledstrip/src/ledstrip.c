@@ -29,6 +29,8 @@
 #define LEDSTRIP_REFRESH_TIME_MS (1000/LEDSTRIP_REFRESH_RATE_HZ)
 #define LEDSTRIP_COUNTER_ROLLOVER (2*LEDSTRIP_REFRESH_RATE_HZ) // vectors are 2 sec long
 #define LEDSTRIP_COUNTER_BEAT_LEN (LEDSTRIP_COUNTER_ROLLOVER/12)
+#define LEDSTRIP_FADE_TIME_MS     (500) // duration of the fade-in/out transition when a LED turns on/off
+#define LEDSTRIP_FADE_STEP        (255 / (LEDSTRIP_FADE_TIME_MS / LEDSTRIP_REFRESH_TIME_MS)) // per-refresh fade increment
 /******************************************************************************
  * Macros
  *****************************************************************************/
@@ -60,8 +62,14 @@ typedef struct
 
 typedef struct
 {
-    LEDSTRIP_LED_COLOR_st color;
-    LEDSTRIP_BLINK_en pattern;
+    LEDSTRIP_LED_COLOR_st color;    // target color
+    LEDSTRIP_BLINK_en pattern;      // target blink pattern
+
+    LEDSTRIP_LED_COLOR_st display_color;  // color currently being rendered (lags target while fading out)
+    LEDSTRIP_BLINK_en display_pattern;    // pattern currently being rendered
+
+    uint8_t fade_level;  // current fade-in/out level, 0 (off) .. 255 (fully on)
+    bool active;         // true if the target color is non-off
 } LEDSTRIP_LED_CONFIG_st;
 
 /* context struct */
@@ -229,15 +237,34 @@ static void LEDSTRIP_encode_all(uint32_t counter)
     uint8_t green;
     uint8_t blue;
     uint8_t intensity;
+    uint8_t target_fade;
+    uint32_t next_fade;
+    LEDSTRIP_LED_CONFIG_st* cfg;
 
     LEDSTRIP_lock();
 
     for (uint32_t led=0; led<LEDSTRIP_NUM_DEVICES; led++)
     {
-        intensity = LEDSTRIP_get_intensity(s_ledstrip.led_config[led].pattern, counter);
-        red   = (((((uint16_t)s_ledstrip.led_config[led].color.r) * (uint16_t)intensity) >> 8) >> s_ledstrip.brightness);
-        green = (((((uint16_t)s_ledstrip.led_config[led].color.g) * (uint16_t)intensity) >> 8) >> s_ledstrip.brightness);
-        blue  = (((((uint16_t)s_ledstrip.led_config[led].color.b) * (uint16_t)intensity) >> 8) >> s_ledstrip.brightness);
+        cfg = &s_ledstrip.led_config[led];
+
+        /* ramp the fade level towards 255 (on) or 0 (off), depending on the target state */
+        target_fade = (cfg->active) ? (UINT8_MAX) : (0);
+
+        if (cfg->fade_level < target_fade)
+        {
+            next_fade = (uint32_t)cfg->fade_level + LEDSTRIP_FADE_STEP;
+            cfg->fade_level = (next_fade >= target_fade) ? (target_fade) : ((uint8_t)next_fade);
+        }
+        else if (cfg->fade_level > target_fade)
+        {
+            cfg->fade_level = ((cfg->fade_level - target_fade) > LEDSTRIP_FADE_STEP) ? (cfg->fade_level - LEDSTRIP_FADE_STEP) : (target_fade);
+        }
+
+        intensity = LEDSTRIP_get_intensity(cfg->display_pattern, counter);
+
+        red   = (uint8_t)((((((uint32_t)cfg->display_color.r * intensity) >> 8) * cfg->fade_level) >> 8) >> s_ledstrip.brightness);
+        green = (uint8_t)((((((uint32_t)cfg->display_color.g * intensity) >> 8) * cfg->fade_level) >> 8) >> s_ledstrip.brightness);
+        blue  = (uint8_t)((((((uint32_t)cfg->display_color.b * intensity) >> 8) * cfg->fade_level) >> 8) >> s_ledstrip.brightness);
 
         LEDSTRIP_encode_led(led, red, green, blue);
     }
@@ -308,11 +335,27 @@ LEDSTRIP_STATUS_t LEDSTRIP_set_led(uint32_t led_num, LEDSTRIP_COLOR_en color, LE
     else
     {
         LEDSTRIP_lock();
-        
-        s_ledstrip.led_config[led_num].color.r = s_predefined_color[color].r;
-        s_ledstrip.led_config[led_num].color.g = s_predefined_color[color].g;
-        s_ledstrip.led_config[led_num].color.b = s_predefined_color[color].b;
-        s_ledstrip.led_config[led_num].pattern = pattern;
+
+        LEDSTRIP_LED_CONFIG_st* cfg = &s_ledstrip.led_config[led_num];
+        LEDSTRIP_LED_COLOR_st new_color = {
+            .r = s_predefined_color[color].r,
+            .g = s_predefined_color[color].g,
+            .b = s_predefined_color[color].b,
+        };
+        bool new_active = (new_color.r != 0) || (new_color.g != 0) || (new_color.b != 0);
+
+        /* turning on, changing color while on, or staying off - render the new color/pattern
+         * right away. When turning off, keep rendering the previous color/pattern so it
+         * fades out instead of disappearing instantly */
+        if (new_active || !cfg->active)
+        {
+            cfg->display_color = new_color;
+            cfg->display_pattern = pattern;
+        }
+
+        cfg->color = new_color;
+        cfg->pattern = pattern;
+        cfg->active = new_active;
 
         LEDSTRIP_unlock();
     }
