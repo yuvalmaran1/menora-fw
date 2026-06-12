@@ -101,8 +101,8 @@ static const THEME_st s_theme_hanuka =
     .id = THEME_HANUKA_ID,
     .name = "Hanuka",
     .num_leds = 9,
-    .led_color = LEDSTRIP_COLOR_ORANGE,
-    .led_pattern = LEDSTRIP_BLINK_GAUSSIAN_1HZ,
+    .led_color = LEDSTRIP_COLOR_CANDLE,
+    .led_pattern = LEDSTRIP_BLINK_CANDLE_FLICKER,
     .songs = s_hanuka_songs,
     .num_songs = sizeof(s_hanuka_songs) / sizeof(s_hanuka_songs[0]),
 };

@@ -38,6 +38,7 @@ COLOR(BLUE,    0,   0,   255) \
 COLOR(CYAN,    0,   255, 255) \
 COLOR(WHITE,   255, 255, 255) \
 COLOR(GREY,    128, 128, 128) \
+COLOR(CANDLE,  255, 50,  0  ) \
 
 /* list expansion for predefined color enumeration */
 #define LEDSTRIP_COLOR_ENUM(name, red, green, blue) LEDSTRIP_COLOR_##name,
@@ -100,6 +101,7 @@ typedef enum
     LEDSTRIP_BLINK_GAUSSIAN_1HZ,
     LEDSTRIP_BLINK_GAUSSIAN_5HZ,
     LEDSTRIP_BLINK_HEARTBEAT_0_5HZ,
+    LEDSTRIP_BLINK_CANDLE_FLICKER,
     LEDSTRIP_BLINK_LENGTH
 } LEDSTRIP_BLINK_en;
 
