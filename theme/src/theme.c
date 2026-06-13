@@ -10,6 +10,7 @@
  *****************************************************************************/
 #include <stddef.h>
 #include "theme.h"
+#include "buzzer_notes.h"
 #include "ms_scheduler.h"
 #include "rtt_log.h"
 
@@ -35,6 +36,7 @@
 typedef enum
 {
     THEME_MUSIC_IDLE,     // nothing playing; the next start begins from the first song
+    THEME_MUSIC_INTRO,    // the intro jingle is playing (not part of the playlist)
     THEME_MUSIC_PLAYING,  // a song is currently sounding
     THEME_MUSIC_GAP,      // a song finished; waiting THEME_MUSIC_GAP_MS before auto-advancing
 } THEME_MUSIC_STATE_en;
@@ -94,6 +96,21 @@ static const LEDSTRIP_COLOR_en s_anim_palette[] = {
     LEDSTRIP_COLOR_WHITE,
 };
 #define THEME_ANIM_PALETTE_LEN (sizeof(s_anim_palette) / sizeof(s_anim_palette[0]))
+
+/*!< short, bright intro jingle played alongside the intro animation: an
+ * ascending major arpeggio with a sparkle, landing on the tonic (~1.3s) */
+static const BUZZER_NOTE_st s_intro_notes[] =
+{
+    { NOTE_C5, 100 }, { NOTE_E5, 100 }, { NOTE_G5, 100 }, { NOTE_C6, 200 },
+    { BUZZER_NOTE_REST, 40 },
+    { NOTE_E6, 100 }, { NOTE_C6, 100 }, { NOTE_G5, 100 }, { NOTE_C6, 400 },
+};
+static const BUZZER_SONG_st s_theme_intro_song =
+{
+    .name = "Intro",
+    .notes = s_intro_notes,
+    .num_notes = sizeof(s_intro_notes) / sizeof(s_intro_notes[0]),
+};
 
 /******************************************************************************
  * Static functions
@@ -183,6 +200,24 @@ static void THEME_anim_start(const THEME_st* theme)
 }
 
 //_____________________________________________________________________________
+/* greet a freshly activated theme: play the intro animation and jingle together
+ * (no-op for the NULL theme). The jingle plays independently of the playlist -
+ * it does not start or advance it. */
+static void THEME_intro_start(const THEME_st* theme)
+{
+    THEME_anim_start(theme);
+
+    if ((theme != NULL) && (theme->num_leds != 0))
+    {
+        s_theme.song_index = 0;
+        s_theme.music_state = THEME_MUSIC_INTRO;
+
+        RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music - playing intro jingle");
+        BUZZER_play(s_theme.buzzer, &s_theme_intro_song);
+    }
+}
+
+//_____________________________________________________________________________
 /* play the song at the given playlist index and enter the PLAYING state */
 static void THEME_music_play_index(uint32_t index)
 {
@@ -250,7 +285,12 @@ static void THEME_music_done_cb(void* ctx)
 {
     (void)ctx;
 
-    if ((s_theme.song_index + 1) < s_theme.active->num_songs)
+    if (s_theme.music_state == THEME_MUSIC_INTRO)
+    {
+        /* intro jingle finished - go quiet; the playlist hasn't started yet */
+        s_theme.music_state = THEME_MUSIC_IDLE;
+    }
+    else if ((s_theme.song_index + 1) < s_theme.active->num_songs)
     {
         s_theme.music_state = THEME_MUSIC_GAP;
         MS_SCHEDULER_schedule(s_theme.music_slot, THEME_music_gap_task, NULL, THEME_MUSIC_GAP_MS, false);
@@ -275,7 +315,7 @@ static void THEME_switch(const THEME_st* new_theme)
     s_theme.lit_led_count = 0;
     s_theme.active = new_theme;
 
-    THEME_anim_start(new_theme);
+    THEME_intro_start(new_theme);
 }
 
 //_____________________________________________________________________________
@@ -331,8 +371,8 @@ THEME_STATUS_t THEME_init(THEME_INIT_CONFIG_st* p_init_config)
     s_theme.detect_slot = MS_SCHEDULER_allocate_slot();
     MS_SCHEDULER_schedule(s_theme.detect_slot, THEME_detect_task, NULL, THEME_DETECT_INTERVAL_MS, true);
 
-    /* greet the initially selected theme with the intro animation */
-    THEME_anim_start(s_theme.active);
+    /* greet the initially selected theme with the intro animation and jingle */
+    THEME_intro_start(s_theme.active);
 
     return THEME_STATUS_OK;
 }
@@ -393,9 +433,10 @@ void THEME_music_short_press(void)
 {
     if (s_theme.active->num_songs != 0)
     {
-        if (s_theme.music_state == THEME_MUSIC_IDLE)
+        if ((s_theme.music_state == THEME_MUSIC_IDLE) || (s_theme.music_state == THEME_MUSIC_INTRO))
         {
-            /* nothing playing yet - start from the first song */
+            /* nothing from the playlist playing yet (idle, or still on the intro
+             * jingle) - start from the first song, replacing the intro */
             THEME_music_play_index(0);
         }
         else
