@@ -74,6 +74,7 @@ typedef struct
  * the entire duration of playback (e.g. a static const array) */
 typedef struct
 {
+    const char* name;       // human readable song name, used for logging
     const BUZZER_NOTE_st* notes;
     uint32_t num_notes;
 } BUZZER_SONG_st;

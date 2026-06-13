@@ -90,6 +90,16 @@ typedef enum
     LEDSTRIP_COLOR_LEN   
 } LEDSTRIP_COLOR_en;
 
+/*!< phase mode enumeration - controls how a LED's blink pattern is aligned in
+ * time relative to the other LEDs */
+typedef enum
+{
+    LEDSTRIP_PHASE_SYNC = 0,   //!< share the global counter - all LEDs blink in phase
+    LEDSTRIP_PHASE_ASYNC,      //!< pattern restarts from index 0 when the LED is set
+    LEDSTRIP_PHASE_RANDOM,     //!< pattern gets a random phase offset when the LED is set
+    LEDSTRIP_PHASE_LENGTH
+} LEDSTRIP_PHASE_en;
+
 /*!< blink pattern enumeration */
 typedef enum
 {
@@ -126,10 +136,11 @@ LEDSTRIP_STATUS_t LEDSTRIP_init(LEDSTRIP_INIT_CONFIG_st* p_init_config);
  * @param[in] led_num led number in strip in range [0, LEDSTRIP_NUM_DEVICES-1]
  * @param[in] color color from @ref LEDSTRIP_COLOR_en
  * @param[in] pattern blink pattern from @ref LEDSTRIP_BLINK_en
+ * @param[in] phase phase mode from @ref LEDSTRIP_PHASE_en
  *
  * @return procedure result
  ******************************************************************************/
-LEDSTRIP_STATUS_t LEDSTRIP_set_led(uint32_t led_num, LEDSTRIP_COLOR_en color, LEDSTRIP_BLINK_en pattern);
+LEDSTRIP_STATUS_t LEDSTRIP_set_led(uint32_t led_num, LEDSTRIP_COLOR_en color, LEDSTRIP_BLINK_en pattern, LEDSTRIP_PHASE_en phase);
 
 /***************************************************************************//**
  * Process LED strip internals

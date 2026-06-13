@@ -20,8 +20,9 @@
  *
  *       static const BUZZER_SONG_st s_song =
  *       {
- *           s_song_notes,
- *           sizeof(s_song_notes) / sizeof(s_song_notes[0])
+ *           .name = "My Song",
+ *           .notes = s_song_notes,
+ *           .num_notes = sizeof(s_song_notes) / sizeof(s_song_notes[0])
  *       };
  *****************************************************************************/
 #ifndef BUZZER_NOTES_H_

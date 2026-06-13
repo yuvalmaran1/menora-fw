@@ -18,9 +18,27 @@
  *****************************************************************************/
 #define THEME_LOG_SOURCE "THEME"
 
+/*!< intro animation played whenever a non-NULL theme becomes active (startup or
+ * hot-swap): a rainbow wipes across the strip and then shimmers before clearing */
+#define THEME_ANIM_START_DELAY_MS (500)                                          // quiet gap before the animation begins
+#define THEME_ANIM_DURATION_MS    (3000)                                         // total visible animation length
+#define THEME_ANIM_STEP_MS        (200)                                          // time between animation frames
+#define THEME_ANIM_TOTAL_STEPS    (THEME_ANIM_DURATION_MS / THEME_ANIM_STEP_MS)  // number of frames
+
+/*!< pause between a song finishing and the next one auto-starting */
+#define THEME_MUSIC_GAP_MS        (3000)
+
 /******************************************************************************
  * Data types
  *****************************************************************************/
+/* music playback state machine */
+typedef enum
+{
+    THEME_MUSIC_IDLE,     // nothing playing; the next start begins from the first song
+    THEME_MUSIC_PLAYING,  // a song is currently sounding
+    THEME_MUSIC_GAP,      // a song finished; waiting THEME_MUSIC_GAP_MS before auto-advancing
+} THEME_MUSIC_STATE_en;
+
 typedef struct
 {
     BUZZER_st* buzzer;  // owned and initialized by the application
@@ -36,9 +54,16 @@ typedef struct
     uint16_t id2_pin;
 
     uint32_t lit_led_count;     // number of theme LEDs currently lit, in range [0, active->num_leds]
-    uint32_t song_index;        // cycles through active->songs[] on each new playback
+    uint32_t song_index;        // index of the currently playing / last played song in active->songs[]
+    THEME_MUSIC_STATE_en music_state;
 
     MS_SCHEDULER_SLOT_t* detect_slot;
+    MS_SCHEDULER_SLOT_t* music_slot;  // drives the inter-song gap before an auto-advance
+
+    MS_SCHEDULER_SLOT_t* anim_slot;  // drives the intro animation frames
+    uint32_t anim_step;              // current intro animation frame index
+    uint32_t anim_epoch;            // bumped on each (re)start so stale queued frames self-cancel
+    bool animating;                  // true while the intro animation is running
 } THEME_PRIVATE_st;
 
 /******************************************************************************
@@ -57,6 +82,18 @@ static const THEME_st s_theme_null =
     .songs = NULL,
     .num_songs = 0,
 };
+
+/*!< vibrant rainbow palette cycled across the strip during the intro animation */
+static const LEDSTRIP_COLOR_en s_anim_palette[] = {
+    LEDSTRIP_COLOR_RED,
+    LEDSTRIP_COLOR_ORANGE,
+    LEDSTRIP_COLOR_YELLOW,
+    LEDSTRIP_COLOR_GREEN,
+    LEDSTRIP_COLOR_CYAN,
+    LEDSTRIP_COLOR_BLUE,
+    LEDSTRIP_COLOR_WHITE,
+};
+#define THEME_ANIM_PALETTE_LEN (sizeof(s_anim_palette) / sizeof(s_anim_palette[0]))
 
 /******************************************************************************
  * Static functions
@@ -78,7 +115,150 @@ static void THEME_leds_all_off(void)
 {
     for (uint32_t led_num = 0; led_num < LEDSTRIP_NUM_DEVICES; led_num++)
     {
-        LEDSTRIP_set_led(led_num, LEDSTRIP_COLOR_OFF, LEDSTRIP_BLINK_0HZ);
+        LEDSTRIP_set_led(led_num, LEDSTRIP_COLOR_OFF, LEDSTRIP_BLINK_0HZ, LEDSTRIP_PHASE_SYNC);
+    }
+}
+
+//_____________________________________________________________________________
+/* render one frame of the intro animation and schedule the next one. A rainbow
+ * wipes in (one LED revealed per frame) and the whole palette rotates across the
+ * strip, so every lit LED shows a different, flowing color. Once all frames have
+ * played the strip is cleared and normal operation resumes. */
+static void THEME_anim_task(void* ctx)
+{
+    uint32_t step = s_theme.anim_step;
+    uint32_t num = s_theme.active->num_leds;
+
+    /* ignore frames left over from a superseded animation (e.g. a theme switch
+     * happened while a frame was still queued) */
+    if ((uint32_t)(uintptr_t)ctx == s_theme.anim_epoch)
+    {
+        if ((step >= THEME_ANIM_TOTAL_STEPS) || (num == 0))
+        {
+            /* animation done - clear the strip and hand control back to normal play */
+            THEME_leds_all_off();
+            s_theme.lit_led_count = 0;
+            s_theme.animating = false;
+        }
+        else
+        {
+            /* LEDs revealed so far - one more per frame until the strip is full */
+            uint32_t revealed = ((step + 1) < num) ? (step + 1) : num;
+
+            for (uint32_t i = 0; i < num; i++)
+            {
+                if (i < revealed)
+                {
+                    LEDSTRIP_COLOR_en color = s_anim_palette[(i + step) % THEME_ANIM_PALETTE_LEN];
+                    LEDSTRIP_set_led(i, color, LEDSTRIP_BLINK_0HZ, LEDSTRIP_PHASE_SYNC);
+                }
+                else
+                {
+                    LEDSTRIP_set_led(i, LEDSTRIP_COLOR_OFF, LEDSTRIP_BLINK_0HZ, LEDSTRIP_PHASE_SYNC);
+                }
+            }
+
+            s_theme.anim_step++;
+
+            MS_SCHEDULER_schedule(s_theme.anim_slot, THEME_anim_task, ctx, THEME_ANIM_STEP_MS, false);
+        }
+    }
+}
+
+//_____________________________________________________________________________
+/* kick off the intro animation for a freshly activated theme (no-op for the
+ * NULL theme, which has no LEDs). The first frame fires after a short delay. */
+static void THEME_anim_start(const THEME_st* theme)
+{
+    if ((theme != NULL) && (theme->num_leds != 0) && (s_theme.anim_slot != NULL))
+    {
+        /* cancel any in-flight animation and invalidate its queued frames */
+        MS_SCHEDULER_abort(s_theme.anim_slot);
+        s_theme.anim_epoch++;
+        s_theme.anim_step = 0;
+        s_theme.animating = true;
+
+        MS_SCHEDULER_schedule(s_theme.anim_slot, THEME_anim_task, (void*)(uintptr_t)s_theme.anim_epoch, THEME_ANIM_START_DELAY_MS, false);
+    }
+}
+
+//_____________________________________________________________________________
+/* play the song at the given playlist index and enter the PLAYING state */
+static void THEME_music_play_index(uint32_t index)
+{
+    const BUZZER_SONG_st* song = s_theme.active->songs[index];
+
+    s_theme.song_index = index;
+    s_theme.music_state = THEME_MUSIC_PLAYING;
+
+    RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music - playing song '%s'", song->name);
+    BUZZER_play(s_theme.buzzer, song);
+}
+
+//_____________________________________________________________________________
+/* stop playback, cancel any pending inter-song gap and rewind the playlist so
+ * the next start begins from the first song */
+static void THEME_music_reset(void)
+{
+    if (s_theme.music_slot != NULL)
+    {
+        MS_SCHEDULER_abort(s_theme.music_slot);
+    }
+
+    BUZZER_stop(s_theme.buzzer);
+    s_theme.song_index = 0;
+    s_theme.music_state = THEME_MUSIC_IDLE;
+}
+
+//_____________________________________________________________________________
+/* advance to the next song; once past the last song, stop and rewind so the
+ * next manual start begins from the first song again */
+static void THEME_music_advance(void)
+{
+    /* cancel any pending gap (e.g. when a button press skips the pause) */
+    if (s_theme.music_slot != NULL)
+    {
+        MS_SCHEDULER_abort(s_theme.music_slot);
+    }
+
+    uint32_t next = s_theme.song_index + 1;
+
+    if (next < s_theme.active->num_songs)
+    {
+        THEME_music_play_index(next);
+    }
+    else
+    {
+        RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music - end of playlist, resetting");
+        THEME_music_reset();
+    }
+}
+
+//_____________________________________________________________________________
+/* inter-song gap elapsed - roll on to the next song */
+static void THEME_music_gap_task(void* ctx)
+{
+    (void)ctx;
+
+    THEME_music_advance();
+}
+
+//_____________________________________________________________________________
+/* a song finished on its own: auto-advance after a short pause, unless it was
+ * the last song - then just rewind so the next press restarts the playlist */
+static void THEME_music_done_cb(void* ctx)
+{
+    (void)ctx;
+
+    if ((s_theme.song_index + 1) < s_theme.active->num_songs)
+    {
+        s_theme.music_state = THEME_MUSIC_GAP;
+        MS_SCHEDULER_schedule(s_theme.music_slot, THEME_music_gap_task, NULL, THEME_MUSIC_GAP_MS, false);
+    }
+    else
+    {
+        RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music - last song finished, resetting");
+        THEME_music_reset();
     }
 }
 
@@ -90,11 +270,12 @@ static void THEME_switch(const THEME_st* new_theme)
     RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Switching theme: %s -> %s", s_theme.active->name, new_theme->name);
 
     THEME_leds_all_off();
-    BUZZER_stop(s_theme.buzzer);
+    THEME_music_reset();
 
     s_theme.lit_led_count = 0;
-    s_theme.song_index = 0;
     s_theme.active = new_theme;
+
+    THEME_anim_start(new_theme);
 }
 
 //_____________________________________________________________________________
@@ -134,14 +315,24 @@ THEME_STATUS_t THEME_init(THEME_INIT_CONFIG_st* p_init_config)
 
     s_theme.themes[THEME_NULL_ID] = &s_theme_null;
     s_theme.active = &s_theme_null;
+    s_theme.music_state = THEME_MUSIC_IDLE;
+
+    /* auto-advance the playlist when a song finishes on its own */
+    BUZZER_register_done_cb(s_theme.buzzer, THEME_music_done_cb, NULL);
 
     /* select the initial theme immediately, then keep sampling periodically */
     uint8_t id = THEME_read_id();
     s_theme.active = (s_theme.themes[id] != NULL) ? s_theme.themes[id] : &s_theme_null;
     RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Theme ID %u - active theme: %s", (unsigned int)id, s_theme.active->name);
 
+    s_theme.anim_slot = MS_SCHEDULER_allocate_slot();
+    s_theme.music_slot = MS_SCHEDULER_allocate_slot();
+
     s_theme.detect_slot = MS_SCHEDULER_allocate_slot();
     MS_SCHEDULER_schedule(s_theme.detect_slot, THEME_detect_task, NULL, THEME_DETECT_INTERVAL_MS, true);
+
+    /* greet the initially selected theme with the intro animation */
+    THEME_anim_start(s_theme.active);
 
     return THEME_STATUS_OK;
 }
@@ -168,19 +359,23 @@ const THEME_st* THEME_get_active(void)
 //_____________________________________________________________________________
 void THEME_light_next(void)
 {
-    if (s_theme.lit_led_count >= s_theme.active->num_leds)
+    /* ignore button-driven lighting while the intro animation owns the strip */
+    if (!s_theme.animating)
     {
-        RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Light next - all LEDs lit - turning off");
+        if (s_theme.lit_led_count >= s_theme.active->num_leds)
+        {
+            RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Light next - all LEDs lit - turning off");
 
-        THEME_leds_all_off();
-        s_theme.lit_led_count = 0;
-    }
-    else
-    {
-        RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Light next - lighting LED %lu", (unsigned long)s_theme.lit_led_count);
+            THEME_leds_all_off();
+            s_theme.lit_led_count = 0;
+        }
+        else
+        {
+            RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Light next - lighting LED %lu", (unsigned long)s_theme.lit_led_count);
 
-        LEDSTRIP_set_led(s_theme.lit_led_count, s_theme.active->led_color, s_theme.active->led_pattern);
-        s_theme.lit_led_count++;
+            LEDSTRIP_set_led(s_theme.lit_led_count, s_theme.active->led_color, s_theme.active->led_pattern, s_theme.active->led_phase);
+            s_theme.lit_led_count++;
+        }
     }
 }
 
@@ -194,31 +389,31 @@ void THEME_light_reset(void)
 }
 
 //_____________________________________________________________________________
-void THEME_music_play_next(void)
+void THEME_music_short_press(void)
 {
-    if (s_theme.active->num_songs == 0)
+    if (s_theme.active->num_songs != 0)
     {
-        return;
+        if (s_theme.music_state == THEME_MUSIC_IDLE)
+        {
+            /* nothing playing yet - start from the first song */
+            THEME_music_play_index(0);
+        }
+        else
+        {
+            /* already playing, or waiting in the inter-song gap - skip to next */
+            THEME_music_advance();
+        }
     }
-
-    const BUZZER_SONG_st* song = s_theme.active->songs[s_theme.song_index % s_theme.active->num_songs];
-    s_theme.song_index++;
-    RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music play next - playing song %lu",
-                (unsigned long)(s_theme.song_index % s_theme.active->num_songs));
-    BUZZER_play(s_theme.buzzer, song);
 }
 
 //_____________________________________________________________________________
-void THEME_music_stop(void)
+void THEME_music_long_press(void)
 {
-    RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music stop");
-    BUZZER_stop(s_theme.buzzer);
-}
-
-//_____________________________________________________________________________
-bool THEME_music_is_playing(void)
-{
-    return BUZZER_get_state(s_theme.buzzer) == BUZZER_STATE_PLAYING;
+    if (s_theme.music_state != THEME_MUSIC_IDLE)
+    {
+        RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music long press - stop and reset");
+        THEME_music_reset();
+    }
 }
 
 //_____________________________________________________________________________

@@ -56,6 +56,7 @@ typedef struct
     uint32_t num_leds;                     // number of ledstrip LEDs used by this theme
     LEDSTRIP_COLOR_en led_color;           // color used for lit LEDs
     LEDSTRIP_BLINK_en led_pattern;         // blink pattern used for lit LEDs
+    LEDSTRIP_PHASE_en led_phase;           // phase mode used for lit LEDs
     const BUZZER_SONG_st * const * songs;  // playlist
     uint32_t num_songs;                    // number of entries in songs[]
 } THEME_st;
@@ -126,26 +127,26 @@ void THEME_light_next(void);
 void THEME_light_reset(void);
 
 /***************************************************************************//**
- * Start playing the next song in the active theme's playlist, replacing any
- * song currently playing
+ * Handle a music-button short press.
+ *
+ * @brief Starts the playlist from the first song when idle, otherwise skips to
+ * the next song (immediately, cancelling any inter-song pause). Skipping past
+ * the last song stops playback and rewinds to the first song.
+ *
+ * @note When a song ends on its own, the next song starts automatically after a
+ * short pause; the last song does not auto-restart - it rewinds the playlist.
  *
  * @return none
  ******************************************************************************/
-void THEME_music_play_next(void);
+void THEME_music_short_press(void);
 
 /***************************************************************************//**
- * Stop playback immediately and silence the output. No-op if idle.
+ * Handle a music-button long press - stop playback and rewind the playlist to
+ * the first song. No-op when no song is playing or pending.
  *
  * @return none
  ******************************************************************************/
-void THEME_music_stop(void);
-
-/***************************************************************************//**
- * Check whether a song is currently playing
- *
- * @return true if a song is currently playing, false otherwise
- ******************************************************************************/
-bool THEME_music_is_playing(void);
+void THEME_music_long_press(void);
 
 /***************************************************************************//**
  * Process theme module internals - drives the LED strip refresh

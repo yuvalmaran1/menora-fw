@@ -31,6 +31,7 @@ static const BUZZER_NOTE_st s_shalom_aleichem_notes[] =
 };
 static const BUZZER_SONG_st s_shalom_aleichem =
 {
+    .name = "Shalom Aleichem",
     .notes = s_shalom_aleichem_notes,
     .num_notes = sizeof(s_shalom_aleichem_notes) / sizeof(s_shalom_aleichem_notes[0])
 };
@@ -52,6 +53,7 @@ static const BUZZER_NOTE_st s_hinei_ma_tov_notes[] =
 };
 static const BUZZER_SONG_st s_hinei_ma_tov =
 {
+    .name = "Hinei Ma Tov",
     .notes = s_hinei_ma_tov_notes,
     .num_notes = sizeof(s_hinei_ma_tov_notes) / sizeof(s_hinei_ma_tov_notes[0])
 };
@@ -70,6 +72,7 @@ static const THEME_st s_theme_shabbat =
     .num_leds = 2,
     .led_color = LEDSTRIP_COLOR_YELLOW,
     .led_pattern = LEDSTRIP_BLINK_GAUSSIAN_1HZ,
+    .led_phase = LEDSTRIP_PHASE_RANDOM,
     .songs = s_shabbat_songs,
     .num_songs = sizeof(s_shabbat_songs) / sizeof(s_shabbat_songs[0]),
 };

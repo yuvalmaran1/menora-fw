@@ -25,6 +25,14 @@
 #define LEDSTRIP_RED_OFFSET     (1)
 #define LEDSTRIP_BLUE_OFFSET    (2)       
 #define LEDSTRIP_BUF_LEN        (LEDSTRIP_NUM_DEVICES * COLORS_PER_LED * BITS_PER_BYTE)
+/* DMA transmit framing (in CCR words, i.e. one PWM bit-period each):
+ *  - a short low lead-in masks the DMA/timer start-up latency and lets the
+ *    data line / output-enable buffer settle before real bits are clocked.
+ *  - a low tail flushes the final bit out of the OC preload register (it is
+ *    only output one period after its DMA transfer) and parks the line low. */
+#define LEDSTRIP_TX_LEAD        (1)
+#define LEDSTRIP_TX_TAIL        (2)
+#define LEDSTRIP_TX_LEN         (LEDSTRIP_TX_LEAD + LEDSTRIP_BUF_LEN + LEDSTRIP_TX_TAIL)
 #define LEDSTRIP_REFRESH_RATE_HZ (100)
 #define LEDSTRIP_REFRESH_TIME_MS (1000/LEDSTRIP_REFRESH_RATE_HZ)
 #define LEDSTRIP_COUNTER_ROLLOVER (2*LEDSTRIP_REFRESH_RATE_HZ) // vectors are 2 sec long
@@ -70,6 +78,7 @@ typedef struct
 
     uint8_t fade_level;  // current fade-in/out level, 0 (off) .. 255 (fully on)
     bool active;         // true if the target color is non-off
+    uint32_t phase_offset; // added to the global counter to shift this LED's pattern in time
 } LEDSTRIP_LED_CONFIG_st;
 
 /* context struct */
@@ -88,8 +97,12 @@ typedef struct
     volatile bool dma_done;
     LEDSTRIP_BRIGHTNESS_en brightness;
     LEDSTRIP_LED_CONFIG_st led_config[LEDSTRIP_NUM_DEVICES];
-    uint32_t dummy[100];
+    /* DMA transmit buffer. tx_lead, led_vals and tx_tail must stay contiguous
+     * and in this order: the DMA walks straight through them as one stream.
+     * tx_lead/tx_tail are left at zero (low) for the whole runtime. */
+    uint32_t tx_lead[LEDSTRIP_TX_LEAD];
     LEDSTRIP_LED_CODE_st led_vals[LEDSTRIP_NUM_DEVICES];
+    uint32_t tx_tail[LEDSTRIP_TX_TAIL];
 } LEDSTRIP_st;
 
 /******************************************************************************
@@ -132,6 +145,9 @@ static const uint8_t s_candle[] = {
 /*!< context struct instance */
 static LEDSTRIP_st s_ledstrip = {0};
 
+/*!< xorshift32 PRNG state, used to spread LED phases in RANDOM mode */
+static uint32_t s_rand_state = 1;
+
 /******************************************************************************
  * Static function prototypes
  *****************************************************************************/
@@ -149,6 +165,43 @@ static void LEDSTRIP_lock(void)
 static void LEDSTRIP_unlock(void)
 {
     OSAL_critical_section_exit();
+}
+
+//_____________________________________________________________________________
+static uint32_t LEDSTRIP_rand(void)
+{
+    /* xorshift32 - cheap, no newlib dependency, good enough for phase spreading */
+    uint32_t x = s_rand_state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    s_rand_state = x;
+    return x;
+}
+
+//_____________________________________________________________________________
+static uint32_t LEDSTRIP_compute_phase_offset(LEDSTRIP_PHASE_en phase)
+{
+    uint32_t offset;
+
+    switch (phase)
+    {
+        case LEDSTRIP_PHASE_ASYNC:
+            /* shift so the pattern reads index 0 at the current counter value */
+            offset = (LEDSTRIP_COUNTER_ROLLOVER - (s_ledstrip.counter % LEDSTRIP_COUNTER_ROLLOVER)) % LEDSTRIP_COUNTER_ROLLOVER;
+            break;
+
+        case LEDSTRIP_PHASE_RANDOM:
+            offset = LEDSTRIP_rand() % LEDSTRIP_COUNTER_ROLLOVER;
+            break;
+
+        case LEDSTRIP_PHASE_SYNC:
+        default:
+            offset = 0;
+            break;
+    }
+
+    return offset;
 }
 
 //_____________________________________________________________________________
@@ -260,7 +313,7 @@ static void LEDSTRIP_encode_all(uint32_t counter)
             cfg->fade_level = ((cfg->fade_level - target_fade) > LEDSTRIP_FADE_STEP) ? (cfg->fade_level - LEDSTRIP_FADE_STEP) : (target_fade);
         }
 
-        intensity = LEDSTRIP_get_intensity(cfg->display_pattern, counter);
+        intensity = LEDSTRIP_get_intensity(cfg->display_pattern, counter + cfg->phase_offset);
 
         red   = (uint8_t)((((((uint32_t)cfg->display_color.r * intensity) >> 8) * cfg->fade_level) >> 8) >> s_ledstrip.brightness);
         green = (uint8_t)((((((uint32_t)cfg->display_color.g * intensity) >> 8) * cfg->fade_level) >> 8) >> s_ledstrip.brightness);
@@ -293,6 +346,9 @@ LEDSTRIP_STATUS_t LEDSTRIP_init(LEDSTRIP_INIT_CONFIG_st* p_init_config)
     s_ledstrip.counter = 0;
     s_ledstrip.dma_done = false;
 
+    /* seed the PRNG with a non-zero value so RANDOM phases differ between boots */
+    s_rand_state = HAL_GetTick() | 1u;
+
     HAL_TIM_RegisterCallback(s_ledstrip.tim, HAL_TIM_PWM_PULSE_FINISHED_CB_ID, LEDSTRIP_timer_cb);
 
     HAL_GPIO_WritePin(s_ledstrip.gpio_led_en, s_ledstrip.gpio_led_en_pin, GPIO_PIN_RESET);
@@ -324,11 +380,11 @@ LEDSTRIP_STATUS_t LEDSTRIP_set_brightness(LEDSTRIP_BRIGHTNESS_en brightness)
 }
 
 //_____________________________________________________________________________
-LEDSTRIP_STATUS_t LEDSTRIP_set_led(uint32_t led_num, LEDSTRIP_COLOR_en color, LEDSTRIP_BLINK_en pattern)
+LEDSTRIP_STATUS_t LEDSTRIP_set_led(uint32_t led_num, LEDSTRIP_COLOR_en color, LEDSTRIP_BLINK_en pattern, LEDSTRIP_PHASE_en phase)
 {
     LEDSTRIP_STATUS_t status = LEDSTRIP_STATUS_OK;
 
-    if ((led_num >= LEDSTRIP_NUM_DEVICES) || (color >= LEDSTRIP_COLOR_LEN) || (pattern >= LEDSTRIP_BLINK_LENGTH))
+    if ((led_num >= LEDSTRIP_NUM_DEVICES) || (color >= LEDSTRIP_COLOR_LEN) || (pattern >= LEDSTRIP_BLINK_LENGTH) || (phase >= LEDSTRIP_PHASE_LENGTH))
     {
         status = LEDSTRIP_STATUS_INVALID_ARG;
     }
@@ -351,6 +407,7 @@ LEDSTRIP_STATUS_t LEDSTRIP_set_led(uint32_t led_num, LEDSTRIP_COLOR_en color, LE
         {
             cfg->display_color = new_color;
             cfg->display_pattern = pattern;
+            cfg->phase_offset = LEDSTRIP_compute_phase_offset(phase);
         }
 
         cfg->color = new_color;
@@ -390,9 +447,24 @@ void LEDSTRIP_process(void)
         /* initiate transmission */
         s_ledstrip.dma_done = false;
 
-        if (HAL_OK == HAL_TIM_PWM_Start_DMA(s_ledstrip.tim, s_ledstrip.tim_ch, (uint32_t*)s_ledstrip.dummy, sizeof(uint32_t)*(100+LEDSTRIP_BUF_LEN)))
+        /* Bring the timer to a known phase before every frame. The counter is
+         * not reset when the previous frame stops, so without this the timer
+         * restarts from a stale count and the first CC DMA request can fire
+         * immediately, shifting/corrupting the first bit. Force CCR low and
+         * load it via a software update event, reset the counter, and clear
+         * any stale update/compare flags. (This is what the old 100-word zero
+         * "dummy" lead-in was masking.) */
+        __HAL_TIM_DISABLE(s_ledstrip.tim);
+        __HAL_TIM_SET_COUNTER(s_ledstrip.tim, 0);
+        __HAL_TIM_SET_COMPARE(s_ledstrip.tim, s_ledstrip.tim_ch, 0);
+        s_ledstrip.tim->Instance->EGR = TIM_EGR_UG;
+        __HAL_TIM_CLEAR_FLAG(s_ledstrip.tim, TIM_FLAG_UPDATE | TIM_FLAG_CC1 | TIM_FLAG_CC2 | TIM_FLAG_CC3 | TIM_FLAG_CC4);
+
+        /* NOTE: HAL_TIM_PWM_Start_DMA() length is in DMA items (CCR words), not
+         * bytes. tx_lead is the head of the contiguous lead/data/tail stream. */
+        if (HAL_OK != HAL_TIM_PWM_Start_DMA(s_ledstrip.tim, s_ledstrip.tim_ch, (uint32_t*)s_ledstrip.tx_lead, LEDSTRIP_TX_LEN))
         {
-            s_ledstrip.dma_done = true; // in case of error, avoid hanging the system - just skip the update   
+            s_ledstrip.dma_done = true; // on error, avoid hanging the system - just skip the update
         }
     }
 }

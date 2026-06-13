@@ -33,6 +33,7 @@ static const BUZZER_NOTE_st s_hanuka_hanuka_notes[] =
 };
 static const BUZZER_SONG_st s_hanuka_hanuka_song =
 {
+    .name = "Hanuka, Hanuka",
     .notes = s_hanuka_hanuka_notes,
     .num_notes = sizeof(s_hanuka_hanuka_notes) / sizeof(s_hanuka_hanuka_notes[0])
 };
@@ -59,6 +60,7 @@ static const BUZZER_NOTE_st s_maoz_tzur_notes[] =
 };
 static const BUZZER_SONG_st s_maoz_tzur =
 {
+    .name     = "Maoz Tzur",
     .notes    = s_maoz_tzur_notes,
     .num_notes = sizeof(s_maoz_tzur_notes) / sizeof(s_maoz_tzur_notes[0])
 };
@@ -83,8 +85,43 @@ static const BUZZER_NOTE_st s_hanukia_li_yesh_notes[] =
 };
 static const BUZZER_SONG_st s_hanukia_li_yesh =
 {
+    .name     = "Hanukia Li Yesh",
     .notes    = s_hanukia_li_yesh_notes,
     .num_notes = sizeof(s_hanukia_li_yesh_notes) / sizeof(s_hanukia_li_yesh_notes[0])
+};
+
+/* Kad Katan */
+static const BUZZER_NOTE_st s_kad_katan_notes[] =
+{
+    { NOTE_E4, 600 }, { NOTE_D4, 200 }, { NOTE_E4, 400 }, { BUZZER_NOTE_REST, 400 },
+    { NOTE_E4, 600 }, { NOTE_D4, 200 }, { NOTE_E4, 400 }, { BUZZER_NOTE_REST, 200 }, { NOTE_E4, 200 },
+
+    { NOTE_E4, 400 },{ NOTE_A4, 400 }, { NOTE_E4, 400 }, { NOTE_FS4, 400 }, 
+    { NOTE_G4, 600 }, { NOTE_FS4, 200 }, { NOTE_E4, 400 }, { BUZZER_NOTE_REST, 400 },
+
+    { NOTE_E4, 600 }, { NOTE_D4, 200 }, { NOTE_E4, 400 }, { BUZZER_NOTE_REST, 400 },
+    { NOTE_E4, 600 }, { NOTE_D4, 200 }, { NOTE_E4, 400 }, { BUZZER_NOTE_REST, 400 },
+
+    { NOTE_G4, 400 }, { NOTE_E4, 400 },{ NOTE_D4, 400 }, { NOTE_E4, 200 }, { NOTE_FS4, 200 },
+    { NOTE_G4, 400 }, { NOTE_FS4, 400 }, { NOTE_E4, 400 }, { BUZZER_NOTE_REST, 400 },
+
+    { NOTE_E4, 400 }, { NOTE_B4, 400 }, { NOTE_A4, 400 }, { NOTE_A4, 400 },
+    { NOTE_E4, 400 }, { NOTE_D4, 400 }, { NOTE_G4, 800 }, 
+
+    { NOTE_E4, 400 }, { NOTE_B4, 400 }, { NOTE_A4, 400 }, { NOTE_A4, 400 },
+    { NOTE_G4, 400 }, { NOTE_FS4, 400 }, { NOTE_E4, 800 }, 
+
+    { NOTE_A4, 400 }, { NOTE_D4, 400 }, { NOTE_D4, 400 }, { NOTE_D4, 400 },
+    { NOTE_CS4, 400 }, { NOTE_D4, 400 }, { NOTE_E4, 800 }, 
+
+    { NOTE_G4, 400 }, { NOTE_E4, 400 }, { NOTE_D4, 400 }, { NOTE_E4, 200 }, { NOTE_FS4, 200 }, 
+    { NOTE_G4, 200 }, { BUZZER_NOTE_REST, 200 },{ NOTE_FS4, 200 }, { BUZZER_NOTE_REST, 200 }, { NOTE_E4, 800 },
+};
+static const BUZZER_SONG_st s_kad_katan =
+{
+    .name     = "Kad Katan",
+    .notes    = s_kad_katan_notes,
+    .num_notes = sizeof(s_kad_katan_notes) / sizeof(s_kad_katan_notes[0])
 };
 
 /* ordered playlist for the Hanuka theme */
@@ -93,7 +130,7 @@ static const BUZZER_SONG_st * const s_hanuka_songs[] =
     &s_hanuka_hanuka_song,
     &s_maoz_tzur,
     &s_hanukia_li_yesh,
-    // &s_oh_chanukah,
+    &s_kad_katan,
 };
 
 static const THEME_st s_theme_hanuka =
@@ -103,6 +140,7 @@ static const THEME_st s_theme_hanuka =
     .num_leds = 9,
     .led_color = LEDSTRIP_COLOR_CANDLE,
     .led_pattern = LEDSTRIP_BLINK_CANDLE_FLICKER,
+    .led_phase = LEDSTRIP_PHASE_RANDOM,
     .songs = s_hanuka_songs,
     .num_songs = sizeof(s_hanuka_songs) / sizeof(s_hanuka_songs[0]),
 };

@@ -87,19 +87,21 @@ static void MENORA_light_btn_long_press_cb(void* ctx)
 }
 
 //_____________________________________________________________________________
-/* music button short press: toggle song playback - start it if idle, stop it if playing */
+/* music button short press: start playback when idle, otherwise skip to the next song */
 static void MENORA_music_btn_short_press_cb(void* ctx)
 {
     (void)ctx;
 
-    if (THEME_music_is_playing())
-    {
-        THEME_music_stop();
-    }
-    else
-    {
-        THEME_music_play_next();
-    }
+    THEME_music_short_press();
+}
+
+//_____________________________________________________________________________
+/* music button long press: stop playback and rewind to the first song */
+static void MENORA_music_btn_long_press_cb(void* ctx)
+{
+    (void)ctx;
+
+    THEME_music_long_press();
 }
 
 //_____________________________________________________________________________
@@ -206,6 +208,7 @@ void MENORA_init(MENORA_INIT_CONFIG_st* p_init_config)
     CAPTOUCH_BTN_register_short_press_cb(&s_menora.light_btn, MENORA_light_btn_short_press_cb, NULL);
     CAPTOUCH_BTN_register_long_press_cb(&s_menora.light_btn, MENORA_light_btn_long_press_cb, NULL);
     CAPTOUCH_BTN_register_short_press_cb(&s_menora.music_btn, MENORA_music_btn_short_press_cb, NULL);
+    CAPTOUCH_BTN_register_long_press_cb(&s_menora.music_btn, MENORA_music_btn_long_press_cb, NULL);
 
     s_menora.btn_readout_slot = MS_SCHEDULER_allocate_slot();
     MS_SCHEDULER_schedule(s_menora.btn_readout_slot, MENORA_btn_readout_task, NULL, MENORA_BTN_READOUT_INTERVAL_MS, true);
