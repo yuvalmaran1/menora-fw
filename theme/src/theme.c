@@ -26,8 +26,8 @@
 #define THEME_ANIM_STEP_MS        (200)                                          // time between animation frames
 #define THEME_ANIM_TOTAL_STEPS    (THEME_ANIM_DURATION_MS / THEME_ANIM_STEP_MS)  // number of frames
 
-/*!< pause between a song finishing and the next one auto-starting */
-#define THEME_MUSIC_GAP_MS        (3000)
+/*!< pause between one song ending (or being skipped) and the next one starting */
+#define THEME_MUSIC_GAP_MS        (1000)
 
 /******************************************************************************
  * Data types
@@ -246,36 +246,38 @@ static void THEME_music_reset(void)
 }
 
 //_____________________________________________________________________________
-/* advance to the next song; once past the last song, stop and rewind so the
- * next manual start begins from the first song again */
-static void THEME_music_advance(void)
+/* inter-song gap elapsed - play the next song */
+static void THEME_music_gap_task(void* ctx)
 {
-    /* cancel any pending gap (e.g. when a button press skips the pause) */
+    (void)ctx;
+
+    THEME_music_play_index(s_theme.song_index + 1);
+}
+
+//_____________________________________________________________________________
+/* move on to the next song after a short silent gap; once past the last song,
+ * stop and rewind so the next manual start begins from the first song again.
+ * Used both when a song ends on its own and when the user skips with a press. */
+static void THEME_music_request_next(void)
+{
+    /* cancel any gap already pending (e.g. a press while waiting in the gap) */
     if (s_theme.music_slot != NULL)
     {
         MS_SCHEDULER_abort(s_theme.music_slot);
     }
 
-    uint32_t next = s_theme.song_index + 1;
-
-    if (next < s_theme.active->num_songs)
+    if ((s_theme.song_index + 1) < s_theme.active->num_songs)
     {
-        THEME_music_play_index(next);
+        /* silence the current song, then pause briefly before the next one */
+        BUZZER_stop(s_theme.buzzer);
+        s_theme.music_state = THEME_MUSIC_GAP;
+        MS_SCHEDULER_schedule(s_theme.music_slot, THEME_music_gap_task, NULL, THEME_MUSIC_GAP_MS, false);
     }
     else
     {
         RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music - end of playlist, resetting");
         THEME_music_reset();
     }
-}
-
-//_____________________________________________________________________________
-/* inter-song gap elapsed - roll on to the next song */
-static void THEME_music_gap_task(void* ctx)
-{
-    (void)ctx;
-
-    THEME_music_advance();
 }
 
 //_____________________________________________________________________________
@@ -290,15 +292,9 @@ static void THEME_music_done_cb(void* ctx)
         /* intro jingle finished - go quiet; the playlist hasn't started yet */
         s_theme.music_state = THEME_MUSIC_IDLE;
     }
-    else if ((s_theme.song_index + 1) < s_theme.active->num_songs)
-    {
-        s_theme.music_state = THEME_MUSIC_GAP;
-        MS_SCHEDULER_schedule(s_theme.music_slot, THEME_music_gap_task, NULL, THEME_MUSIC_GAP_MS, false);
-    }
     else
     {
-        RTT_LOG_log(RTT_INFO, THEME_LOG_SOURCE, "Music - last song finished, resetting");
-        THEME_music_reset();
+        THEME_music_request_next();
     }
 }
 
@@ -441,8 +437,9 @@ void THEME_music_short_press(void)
         }
         else
         {
-            /* already playing, or waiting in the inter-song gap - skip to next */
-            THEME_music_advance();
+            /* already playing, or waiting in the inter-song gap - move to the
+             * next song (after the same brief gap) */
+            THEME_music_request_next();
         }
     }
 }
